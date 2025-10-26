@@ -1,2 +1,14 @@
 # Connect6-RMI
-Connect6 game using Java RMI technology
+--------------------------------
+```bash
+# Скачивание репозитория
+git clone https://github.com/wabka22/Connect6-RMI
+```
+```bash
+# сборка проекта 
+mvn clean package
+```
+```bash
+# Запуск сервера 
+cd server && java -cp target/classes;../common/target/classes ServerApp
+```
