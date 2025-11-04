@@ -13,11 +13,10 @@ import java.util.Map;
 
 public class GameServer implements RemoteGameInterface {
     private Connect6Game game;
-    private Map<String, RemoteClientInterface> clients = new LinkedHashMap<>();
+    private final Map<String, RemoteClientInterface> clients = new LinkedHashMap<>();
     private boolean gameStarted = false;
     private String currentPlayer;
-    private Map<String, Integer> score = new LinkedHashMap<>();
-    private Map<String, Boolean> rematchRequests = new LinkedHashMap<>();
+    private final Map<String, Boolean> rematchRequests = new LinkedHashMap<>();
 
     public static void main(String[] args) {
         try {
@@ -39,15 +38,15 @@ public class GameServer implements RemoteGameInterface {
             return;
         }
         clients.put(playerName, client);
-        score.putIfAbsent(playerName, 0);
         System.out.println("Player connected: " + playerName);
 
-        if (clients.size() == 2 && !gameStarted) startGame();
-        else client.showError("Waiting for another player...");
+        if (clients.size() == 2 && !gameStarted)
+            startGame();
+        else
+            client.showError("Waiting for another player...");
 
-        if (clients.size() == 2) {
+        if (clients.size() == 2)
             for (RemoteClientInterface c : clients.values()) c.showError("");
-        }
     }
 
     private void startGame() throws RemoteException {
@@ -75,10 +74,7 @@ public class GameServer implements RemoteGameInterface {
         }
 
         RemoteClientInterface client = clients.get(playerName);
-        if (client == null) {
-            System.out.println("Received move from unknown player: " + playerName);
-            return;
-        }
+        if (client == null) return;
 
         if (!playerName.equals(currentPlayer)) {
             client.showError("Not your turn");
@@ -95,64 +91,49 @@ public class GameServer implements RemoteGameInterface {
 
         if (game.isGameOver()) {
             String winner = game.getWinner();
-            for (RemoteClientInterface c : clients.values()) {
-                c.gameOver(winner);
-            }
-            resetGame();
+            for (RemoteClientInterface c : clients.values()) c.gameOver(winner);
+            gameStarted = false;
             return;
         }
 
-        // Проверка, нужно ли сменить игрока
         if (game.shouldSwitchPlayer()) {
             String[] players = clients.keySet().toArray(new String[0]);
             currentPlayer = currentPlayer.equals(players[0]) ? players[1] : players[0];
             game.switchPlayer();
         }
 
-        // Обновляем чей ход у всех
-        for (Map.Entry<String, RemoteClientInterface> entry : clients.entrySet()) {
+        for (Map.Entry<String, RemoteClientInterface> entry : clients.entrySet())
             entry.getValue().setCurrentTurn(currentPlayer);
-        }
     }
-
-    private void resetGame() {
-        gameStarted = false;
-        game = null; // чтобы NPE не было
-        currentPlayer = null;
-        clients.clear(); // при необходимости очищать подключённых клиентов
-        System.out.println("Game reset. Waiting for new players...");
-    }
-
 
     @Override
     public synchronized void disconnect(String playerName) throws RemoteException {
         clients.remove(playerName);
         rematchRequests.remove(playerName);
         if (gameStarted && clients.size() < 2) {
-            for (RemoteClientInterface client : clients.values()) client.gameOver("DISCONNECT");
+            for (RemoteClientInterface client : clients.values())
+                client.gameOver("DISCONNECT");
             gameStarted = false;
             currentPlayer = null;
         }
     }
 
     private void broadcastBoard() throws RemoteException {
+        if (game == null) return;
         char[][] board = game.getBoard();
-        for (RemoteClientInterface client : clients.values()) client.updateBoard(board);
+        for (RemoteClientInterface client : clients.values())
+            client.updateBoard(board);
     }
 
     @Override
     public synchronized void requestRematch(String playerName) throws RemoteException {
         rematchRequests.put(playerName, true);
+
+        // оба игрока нажали "играть сначала"
         if (rematchRequests.size() == 2 && rematchRequests.values().stream().allMatch(b -> b)) {
-            game.resetGame();
-            String[] players = clients.keySet().toArray(new String[0]);
-            currentPlayer = players[0];
-            for (RemoteClientInterface client : clients.values()) {
-                client.gameStarted();
-                client.setCurrentTurn(currentPlayer);
-            }
+            System.out.println("Starting rematch...");
+            startGame();
             rematchRequests.clear();
-            broadcastBoard();
         }
     }
 }
