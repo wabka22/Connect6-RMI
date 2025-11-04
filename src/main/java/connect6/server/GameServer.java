@@ -8,18 +8,18 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class GameServer implements RemoteGameInterface {
     private Connect6Game game;
-    private Map<String, RemoteClientInterface> clients = new HashMap<>();
+    // Используем LinkedHashMap — порядок вставки сохраняется
+    private Map<String, RemoteClientInterface> clients = new LinkedHashMap<>();
     private boolean gameStarted = false;
     private String currentPlayer;
 
     public static void main(String[] args) {
         try {
-            // Установка политики безопасности для RMI
             System.setProperty("java.security.policy", "server.policy");
 
             GameServer server = new GameServer();
@@ -72,6 +72,7 @@ public class GameServer implements RemoteGameInterface {
             client.gameStarted();
         }
 
+        // оповестить текущего игрока о ходе
         clients.get(currentPlayer).setCurrentTurn(currentPlayer);
         broadcastBoard();
 
@@ -90,7 +91,9 @@ public class GameServer implements RemoteGameInterface {
             return;
         }
 
-        char expectedPlayer = (playerName.equals(clients.keySet().toArray(new String[0])[0])) ? 'B' : 'W';
+        // expected player char
+        String[] players = clients.keySet().toArray(new String[0]);
+        char expectedPlayer = playerName.equals(players[0]) ? 'B' : 'W';
         if (game.getCurrentPlayer() != expectedPlayer) {
             clients.get(playerName).showError("Not your turn");
             return;
@@ -107,8 +110,7 @@ public class GameServer implements RemoteGameInterface {
                 System.out.println("Game over! Winner: " + winner);
                 resetGame();
             } else {
-                // Switch turn
-                String[] players = clients.keySet().toArray(new String[0]);
+                // смена текущего игрока: у нас clients - LinkedHashMap, players в порядке регистрации
                 currentPlayer = currentPlayer.equals(players[0]) ? players[1] : players[0];
                 clients.get(currentPlayer).setCurrentTurn(currentPlayer);
             }

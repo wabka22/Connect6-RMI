@@ -1,7 +1,7 @@
 package connect6.client;
 
-import connect6.rmi.RemoteGameInterface;
 import connect6.rmi.RemoteClientInterface;
+import connect6.rmi.RemoteGameInterface;
 
 import javax.swing.*;
 import java.awt.*;
@@ -13,190 +13,173 @@ import java.rmi.server.UnicastRemoteObject;
 public class GameClient extends JFrame implements RemoteClientInterface {
     private RemoteGameInterface gameServer;
     private String playerName;
-
-    private JLabel statusLabel;
-    private JLabel turnInfoLabel;
-    private GameBoardPanel boardPanel;
-
     private String playerRole;
     private boolean myTurn = false;
     private boolean gameActive = false;
 
+    private JLabel statusLabel;
+    private JLabel turnInfoLabel;
+    private JLabel roleLabel;
+    private GameBoardPanel boardPanel;
+
     public GameClient() {
+        try {
+            UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
+        } catch (Exception ignored) {}
         initializeGUI();
     }
 
     private void initializeGUI() {
-        setTitle("Connect6 Game - RMI");
+        setTitle("Connect6 - RMI Client");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(8,8));
 
-        // Панель ввода имени
-        JPanel namePanel = new JPanel(new FlowLayout());
-        namePanel.add(new JLabel("Player Name:"));
-        JTextField nameField = new JTextField(15);
-        nameField.setText("Player" + (System.currentTimeMillis() % 1000));
-        namePanel.add(nameField);
-
+        // Верхняя панель подключения
+        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        JTextField nameField = new JTextField("Player" + (System.currentTimeMillis() % 1000), 15);
         JButton connectButton = new JButton("Connect");
-        namePanel.add(connectButton);
-        add(namePanel, BorderLayout.NORTH);
+        JButton disconnectButton = new JButton("Disconnect");
+        disconnectButton.setEnabled(false);
+        top.add(new JLabel("Player Name:"));
+        top.add(nameField);
+        top.add(connectButton);
+        top.add(disconnectButton);
+        add(top, BorderLayout.NORTH);
 
-        statusLabel = new JLabel("Enter name and connect to server");
-        statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        add(statusLabel, BorderLayout.CENTER);
+        // Правая панель статуса
+        JPanel right = new JPanel();
+        right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
+        right.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
 
-        turnInfoLabel = new JLabel("Waiting for connection...");
-        turnInfoLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-        add(turnInfoLabel, BorderLayout.SOUTH);
+        statusLabel = new JLabel("Not connected");
+        roleLabel = new JLabel("Role: -");
+        turnInfoLabel = new JLabel("Turn: -");
+        statusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        roleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        turnInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+        right.add(statusLabel);
+        right.add(Box.createVerticalStrut(8));
+        right.add(roleLabel);
+        right.add(Box.createVerticalStrut(8));
+        right.add(turnInfoLabel);
+        add(right, BorderLayout.EAST);
+
+        // Центральная панель — доска
         boardPanel = new GameBoardPanel(19);
         boardPanel.setClickListener(this::handleBoardClick);
-        add(new JScrollPane(boardPanel), BorderLayout.CENTER);
+        add(boardPanel, BorderLayout.CENTER);
 
         connectButton.addActionListener(e -> {
             playerName = nameField.getText().trim();
-            if (!playerName.isEmpty()) {
-                connectToServer(playerName);
-            } else {
-                JOptionPane.showMessageDialog(this, "Please enter player name");
+            if (playerName.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Enter player name");
+                return;
+            }
+            connectToServer(playerName);
+            if (gameServer != null) {
+                connectButton.setEnabled(false);
+                disconnectButton.setEnabled(true);
             }
         });
 
-        pack();
+        disconnectButton.addActionListener(e -> dispose());
+
+        setSize(900, 850);
         setLocationRelativeTo(null);
-        setSize(700, 700);
     }
 
-    private void connectToServer(String playerName) {
+    private void connectToServer(String name) {
         try {
-            // Установка политики безопасности для RMI
             System.setProperty("java.security.policy", "client.policy");
-
-            Registry registry = LocateRegistry.getRegistry(
-                    ClientConstants.SERVER_HOST,
-                    ClientConstants.RMI_PORT
-            );
-
+            Registry registry = LocateRegistry.getRegistry(ClientConstants.SERVER_HOST, ClientConstants.RMI_PORT);
             gameServer = (RemoteGameInterface) registry.lookup(ClientConstants.GAME_SERVER_NAME);
 
-            // Экспортируем клиентский объект для callback'ов
-            RemoteClientInterface clientStub = (RemoteClientInterface)
-                    UnicastRemoteObject.exportObject(this, 0);
+            RemoteClientInterface stub = (RemoteClientInterface) UnicastRemoteObject.exportObject(this, 0);
+            gameServer.registerClient(stub, name);
 
-            gameServer.registerClient(clientStub, playerName);
-
-            statusLabel.setText("Connected to server as: " + playerName);
-
+            statusLabel.setText("Connected as: " + name);
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this,
-                    "Connection failed: " + e.getMessage(),
-                    "Connection Error",
-                    JOptionPane.ERROR_MESSAGE
-            );
+            JOptionPane.showMessageDialog(this, "Connection failed: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     private void handleBoardClick(int x, int y) {
-        if (gameActive && myTurn && gameServer != null) {
-            try {
-                gameServer.makeMove(playerName, x, y);
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this,
-                        "Move failed: " + e.getMessage(),
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
-            }
+        if (!gameActive) {
+            JOptionPane.showMessageDialog(this, "Game not started yet");
+            return;
+        }
+        if (!myTurn) {
+            JOptionPane.showMessageDialog(this, "Not your turn");
+            return;
+        }
+        try {
+            gameServer.makeMove(playerName, x, y);
+        } catch (RemoteException e) {
+            JOptionPane.showMessageDialog(this, "Move failed: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    // Реализация RemoteClientInterface methods
+    // --- RMI CALLBACKS ---
     @Override
-    public void updateBoard(char[][] board) throws RemoteException {
-        SwingUtilities.invokeLater(() -> {
-            boardPanel.setBoard(board);
-        });
+    public void updateBoard(char[][] board) {
+        SwingUtilities.invokeLater(() -> boardPanel.setBoard(board));
     }
 
     @Override
-    public void setPlayerRole(String role) throws RemoteException {
+    public void setPlayerRole(String role) {
         SwingUtilities.invokeLater(() -> {
             playerRole = role;
-            statusLabel.setText("You are: " + role + " - " + playerName);
+            roleLabel.setText("Role: " + role);
+            statusLabel.setText("Connected as: " + playerName + " (" + role + ")");
         });
     }
 
     @Override
-    public void setCurrentTurn(String player) throws RemoteException {
+    public void setCurrentTurn(String player) {
         SwingUtilities.invokeLater(() -> {
             myTurn = player.equals(playerName);
-            turnInfoLabel.setText(myTurn ?
-                    "Your turn! Make a move (" + playerRole + ")" :
-                    "Opponent's turn - waiting..."
-            );
+            turnInfoLabel.setText(myTurn ? "Your turn (" + playerRole + ")" : "Opponent's turn");
         });
     }
 
     @Override
-    public void gameStarted() throws RemoteException {
+    public void gameStarted() {
         SwingUtilities.invokeLater(() -> {
             gameActive = true;
-            turnInfoLabel.setText("Game started! Waiting for turn...");
+            statusLabel.setText("Game started!");
         });
     }
 
     @Override
-    public void gameOver(String winner) throws RemoteException {
+    public void gameOver(String winner) {
         SwingUtilities.invokeLater(() -> {
             gameActive = false;
             myTurn = false;
-
-            if (winner.equals("DISCONNECT")) {
-                JOptionPane.showMessageDialog(this,
-                        "Opponent disconnected!",
-                        "Game Over",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-                turnInfoLabel.setText("Game Over - Opponent disconnected");
-            } else {
-                JOptionPane.showMessageDialog(this,
-                        "Game Over! Winner: " + winner,
-                        "Game Over",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-                turnInfoLabel.setText("Game Over - Winner: " + winner);
-            }
+            JOptionPane.showMessageDialog(this, "Game Over! Winner: " + winner);
         });
     }
 
     @Override
-    public void showError(String message) throws RemoteException {
-        SwingUtilities.invokeLater(() -> {
-            JOptionPane.showMessageDialog(this,
-                    message,
-                    "Error",
-                    JOptionPane.ERROR_MESSAGE
-            );
-        });
+    public void showError(String message) {
+        SwingUtilities.invokeLater(() ->
+                JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE));
     }
 
     @Override
     public void dispose() {
-        if (gameServer != null && playerName != null) {
-            try {
+        try {
+            if (gameServer != null && playerName != null) {
                 gameServer.disconnect(playerName);
-            } catch (Exception e) {
-                e.printStackTrace();
             }
-        }
+        } catch (Exception ignored) {}
         super.dispose();
+        System.exit(0);
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            new GameClient().setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new GameClient().setVisible(true));
     }
 }

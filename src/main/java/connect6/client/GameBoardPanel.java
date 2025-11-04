@@ -1,41 +1,47 @@
 package connect6.client;
 
+import connect6.client.ui.BoardRenderer;
+import connect6.client.ui.HoverHighlighter;
+import connect6.client.ui.StoneImages;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.function.BiConsumer;
 
 public class GameBoardPanel extends JPanel {
+    private final int boardSize;
+    private final int cellSize = 30;
+    private final int offset = 30;
     private char[][] board;
-    private int boardSize;
-    private BoardClickListener clickListener;
-
-    public interface BoardClickListener {
-        void onBoardClick(int x, int y);
-    }
+    private Point hoverCell;
+    private BiConsumer<Integer, Integer> clickListener;
 
     public GameBoardPanel(int boardSize) {
         this.boardSize = boardSize;
         this.board = new char[boardSize][boardSize];
-        initializeBoard();
+        setPreferredSize(new Dimension(boardSize * cellSize + offset * 2, boardSize * cellSize + offset * 2));
+        setBackground(new Color(240, 230, 200));
+        StoneImages.load();
 
-        setPreferredSize(new Dimension(600, 600));
-        setBackground(new Color(220, 179, 92));
+        addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                hoverCell = getCellFromMouse(e.getX(), e.getY());
+                repaint();
+            }
+        });
 
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                handleClick(e.getX(), e.getY());
+                Point cell = getCellFromMouse(e.getX(), e.getY());
+                if (cell != null && clickListener != null) {
+                    clickListener.accept(cell.x, cell.y);
+                }
             }
         });
-    }
-
-    private void initializeBoard() {
-        for (int i = 0; i < boardSize; i++) {
-            for (int j = 0; j < boardSize; j++) {
-                board[i][j] = '.';
-            }
-        }
     }
 
     public void setBoard(char[][] newBoard) {
@@ -43,74 +49,34 @@ public class GameBoardPanel extends JPanel {
         repaint();
     }
 
-    public void setClickListener(BoardClickListener listener) {
+    public void setClickListener(BiConsumer<Integer, Integer> listener) {
         this.clickListener = listener;
     }
 
-    private void handleClick(int x, int y) {
-        int cellSize = Math.min(getWidth(), getHeight()) / boardSize;
-        int boardX = x / cellSize;
-        int boardY = y / cellSize;
-
-        if (boardX < boardSize && boardY < boardSize && clickListener != null) {
-            clickListener.onBoardClick(boardX, boardY);
-        }
+    private Point getCellFromMouse(int x, int y) {
+        int cellX = (x - offset) / cellSize;
+        int cellY = (y - offset) / cellSize;
+        if (cellX < 0 || cellX >= boardSize || cellY < 0 || cellY >= boardSize)
+            return null;
+        return new Point(cellX, cellY);
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        drawBoard(g);
-        drawStones(g);
-    }
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        BoardRenderer.drawBoard(g2, boardSize, cellSize, offset, offset);
 
-    private void drawBoard(Graphics g) {
-        int width = getWidth();
-        int height = getHeight();
-        int cellSize = Math.min(width, height) / boardSize;
+        if (hoverCell != null)
+            HoverHighlighter.draw(g2, offset + hoverCell.x * cellSize, offset + hoverCell.y * cellSize, cellSize);
 
-        g.setColor(Color.BLACK);
-
-        for (int i = 0; i < boardSize; i++) {
-            g.drawLine(cellSize / 2, i * cellSize + cellSize / 2,
-                    (boardSize - 1) * cellSize + cellSize / 2, i * cellSize + cellSize / 2);
-            g.drawLine(i * cellSize + cellSize / 2, cellSize / 2,
-                    i * cellSize + cellSize / 2, (boardSize - 1) * cellSize + cellSize / 2);
-        }
-
-        if (boardSize == 19) {
-            int[] points = {3, 9, 15};
-            for (int x : points) {
-                for (int y : points) {
-                    g.fillOval(x * cellSize + cellSize / 2 - 3,
-                            y * cellSize + cellSize / 2 - 3, 6, 6);
-                }
-            }
-        }
-    }
-
-    private void drawStones(Graphics g) {
-        int width = getWidth();
-        int height = getHeight();
-        int cellSize = Math.min(width, height) / boardSize;
-
-        for (int i = 0; i < boardSize; i++) {
-            for (int j = 0; j < boardSize; j++) {
-                if (board[i][j] != '.') {
-                    int stoneX = i * cellSize + cellSize / 2;
-                    int stoneY = j * cellSize + cellSize / 2;
-                    int stoneSize = cellSize - 6;
-
-                    if (board[i][j] == 'B') {
-                        g.setColor(Color.BLACK);
-                        g.fillOval(stoneX - stoneSize / 2, stoneY - stoneSize / 2, stoneSize, stoneSize);
-                    } else if (board[i][j] == 'W') {
-                        g.setColor(Color.WHITE);
-                        g.fillOval(stoneX - stoneSize / 2, stoneY - stoneSize / 2, stoneSize, stoneSize);
-                        g.setColor(Color.GRAY);
-                        g.drawOval(stoneX - stoneSize / 2, stoneY - stoneSize / 2, stoneSize, stoneSize);
-                    }
-                }
+        for (int y = 0; y < boardSize; y++) {
+            for (int x = 0; x < boardSize; x++) {
+                if (board[y][x] == 'B')
+                    g2.drawImage(StoneImages.getBlack(), offset + x * cellSize - 5, offset + y * cellSize - 5, cellSize, cellSize, this);
+                else if (board[y][x] == 'W')
+                    g2.drawImage(StoneImages.getWhite(), offset + x * cellSize - 5, offset + y * cellSize - 5, cellSize, cellSize, this);
             }
         }
     }
