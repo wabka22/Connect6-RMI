@@ -1,7 +1,9 @@
 package connect6.client;
 
+import connect6.game.PlayerType;
 import connect6.rmi.RemoteClientInterface;
 import connect6.rmi.RemoteGameInterface;
+
 import javax.swing.*;
 import java.awt.*;
 import java.rmi.RemoteException;
@@ -12,7 +14,7 @@ import java.rmi.server.UnicastRemoteObject;
 public class GameClient extends JFrame implements RemoteClientInterface {
     private RemoteGameInterface gameServer;
     private String playerName;
-    private String playerRole;
+    private PlayerType playerRole;
     private boolean myTurn = false;
     private boolean gameActive = false;
 
@@ -139,16 +141,16 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     @Override
     public void setPlayerRole(String role) {
         SwingUtilities.invokeLater(() -> {
-            playerRole = role;
-            roleLabel.setText("Role: " + role);
-            statusLabel.setText("Connected as: " + playerName + " (" + role + ")");
+            playerRole = PlayerType.valueOf(role);
+            roleLabel.setText("Role: " + playerRole);
+            statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
         });
     }
 
     @Override
     public void setCurrentTurn(String player) {
         SwingUtilities.invokeLater(() -> {
-            myTurn = player.equals(playerName);
+            myTurn = player.equals(playerName); // Текущий игрок по имени
             turnInfoLabel.setText(myTurn ? "Your turn (" + playerRole + ")" : "Opponent's turn");
         });
     }
@@ -167,7 +169,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
             gameActive = false;
             myTurn = false;
 
-            if (winner.equals(playerRole)) playerWins++;
+            if (winner.equals(playerRole.name())) playerWins++;
             else if (!winner.equals("DISCONNECT")) opponentWins++;
 
             updateScore();

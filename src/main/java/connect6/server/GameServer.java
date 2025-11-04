@@ -1,6 +1,7 @@
 package connect6.server;
 
 import connect6.game.Connect6Game;
+import connect6.game.PlayerType;
 import connect6.rmi.RemoteClientInterface;
 import connect6.rmi.RemoteGameInterface;
 
@@ -48,7 +49,6 @@ public class GameServer implements RemoteGameInterface {
         }
 
         if (clients.size() == 2) {
-            // Очистить сообщение ожидания для обоих
             for (RemoteClientInterface c : clients.values()) {
                 c.showError("");
             }
@@ -63,8 +63,8 @@ public class GameServer implements RemoteGameInterface {
         String[] playerNames = clients.keySet().toArray(new String[0]);
         currentPlayer = playerNames[0];
 
-        clients.get(playerNames[0]).setPlayerRole("BLACK");
-        clients.get(playerNames[1]).setPlayerRole("WHITE");
+        clients.get(playerNames[0]).setPlayerRole(PlayerType.BLACK.name());
+        clients.get(playerNames[1]).setPlayerRole(PlayerType.WHITE.name());
 
         for (RemoteClientInterface client : clients.values()) {
             client.gameStarted();
