@@ -38,10 +38,11 @@ build/
 # VS Code
 .vscode/
 
-
 # Windows
 Thumbs.db
 ehthumbs.db
+nul
+$null
 
 # Logs
 *.log

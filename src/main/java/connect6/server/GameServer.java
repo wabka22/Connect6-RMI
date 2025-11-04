@@ -1,8 +1,8 @@
 package connect6.server;
 
 import connect6.game.Connect6Game;
-import connect6.rmi.RemoteGameInterface;
 import connect6.rmi.RemoteClientInterface;
+import connect6.rmi.RemoteGameInterface;
 
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -13,7 +13,6 @@ import java.util.Map;
 
 public class GameServer implements RemoteGameInterface {
     private Connect6Game game;
-    // Используем LinkedHashMap — порядок вставки сохраняется
     private Map<String, RemoteClientInterface> clients = new LinkedHashMap<>();
     private boolean gameStarted = false;
     private String currentPlayer;
@@ -33,7 +32,6 @@ public class GameServer implements RemoteGameInterface {
             System.out.println("Waiting for players...");
 
         } catch (Exception e) {
-            System.err.println("Server exception: " + e.toString());
             e.printStackTrace();
         }
     }
@@ -60,23 +58,18 @@ public class GameServer implements RemoteGameInterface {
         gameStarted = true;
 
         String[] playerNames = clients.keySet().toArray(new String[0]);
-        String blackPlayer = playerNames[0];
-        String whitePlayer = playerNames[1];
+        currentPlayer = playerNames[0]; // черный ходит первым
 
-        clients.get(blackPlayer).setPlayerRole("BLACK");
-        clients.get(whitePlayer).setPlayerRole("WHITE");
-
-        currentPlayer = blackPlayer;
+        clients.get(playerNames[0]).setPlayerRole("BLACK");
+        clients.get(playerNames[1]).setPlayerRole("WHITE");
 
         for (RemoteClientInterface client : clients.values()) {
             client.gameStarted();
         }
 
-        // оповестить текущего игрока о ходе
         clients.get(currentPlayer).setCurrentTurn(currentPlayer);
         broadcastBoard();
-
-        System.out.println("Game started! Black: " + blackPlayer + ", White: " + whitePlayer);
+        System.out.println("Game started! Black: " + playerNames[0] + ", White: " + playerNames[1]);
     }
 
     @Override
@@ -91,31 +84,33 @@ public class GameServer implements RemoteGameInterface {
             return;
         }
 
-        // expected player char
-        String[] players = clients.keySet().toArray(new String[0]);
-        char expectedPlayer = playerName.equals(players[0]) ? 'B' : 'W';
-        if (game.getCurrentPlayer() != expectedPlayer) {
-            clients.get(playerName).showError("Not your turn");
+        boolean moveSuccess = game.placeStone(x, y);
+        if (!moveSuccess) {
+            clients.get(playerName).showError("Invalid move");
             return;
         }
 
-        if (game.makeMove(x, y)) {
-            broadcastBoard();
+        broadcastBoard();
 
-            if (game.isGameOver()) {
-                String winner = game.getWinner();
-                for (RemoteClientInterface client : clients.values()) {
-                    client.gameOver(winner);
-                }
-                System.out.println("Game over! Winner: " + winner);
-                resetGame();
-            } else {
-                // смена текущего игрока: у нас clients - LinkedHashMap, players в порядке регистрации
-                currentPlayer = currentPlayer.equals(players[0]) ? players[1] : players[0];
-                clients.get(currentPlayer).setCurrentTurn(currentPlayer);
+        if (game.isGameOver()) {
+            String winner = game.getWinner();
+            for (RemoteClientInterface client : clients.values()) {
+                client.gameOver(winner);
             }
-        } else {
-            clients.get(playerName).showError("Invalid move");
+            resetGame();
+            return;
+        }
+
+        // Проверка, нужно ли сменить игрока
+        if (game.shouldSwitchPlayer()) {
+            String[] players = clients.keySet().toArray(new String[0]);
+            currentPlayer = currentPlayer.equals(players[0]) ? players[1] : players[0];
+            game.switchPlayer();
+        }
+
+        // Обновляем чей ход у всех
+        for (Map.Entry<String, RemoteClientInterface> entry : clients.entrySet()) {
+            entry.getValue().setCurrentTurn(currentPlayer);
         }
     }
 

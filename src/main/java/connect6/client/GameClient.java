@@ -2,7 +2,7 @@ package connect6.client;
 
 import connect6.rmi.RemoteClientInterface;
 import connect6.rmi.RemoteGameInterface;
-
+import connect6.client.ui.BoardRenderer;
 import javax.swing.*;
 import java.awt.*;
 import java.rmi.RemoteException;
@@ -22,12 +22,37 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     private JLabel roleLabel;
     private GameBoardPanel boardPanel;
 
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new GameClient().setVisible(true));
+    }
+
+
     public GameClient() {
         try {
             UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
         } catch (Exception ignored) {}
         initializeGUI();
     }
+
+//    @Override
+//    protected void paintComponent(Graphics g) {
+//        super.paintComponent(g);
+//        Graphics2D g2 = (Graphics2D) g;
+//
+//        // Рисуем доску и камни
+//        BoardRenderer.drawBoard(g2, game.getBoardSize(), cellSize, offsetX, offsetY);
+//        drawStones(g2);
+//
+//        // Надпись о ходе
+//        g2.setColor(Color.BLACK);
+//        g2.setFont(new Font("Arial", Font.BOLD, 16));
+//        if (currentTurn != null && currentTurn.equals(playerName)) {
+//            g2.drawString("Твой ход", 10, 20);
+//        } else {
+//            g2.drawString("Ход соперника", 10, 20);
+//        }
+//    }
+
 
     private void initializeGUI() {
         setTitle("Connect6 - RMI Client");
@@ -168,6 +193,8 @@ public class GameClient extends JFrame implements RemoteClientInterface {
                 JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE));
     }
 
+
+
     @Override
     public void dispose() {
         try {
@@ -179,7 +206,4 @@ public class GameClient extends JFrame implements RemoteClientInterface {
         System.exit(0);
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new GameClient().setVisible(true));
-    }
 }
