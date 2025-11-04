@@ -2,7 +2,6 @@ package connect6.client;
 
 import connect6.rmi.RemoteClientInterface;
 import connect6.rmi.RemoteGameInterface;
-import connect6.client.ui.BoardRenderer;
 import javax.swing.*;
 import java.awt.*;
 import java.rmi.RemoteException;
@@ -22,7 +21,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     private JLabel roleLabel;
     private JLabel scoreLabel;
     private GameBoardPanel boardPanel;
-    private JButton rematchButton;
 
     private int playerWins = 0;
     private int opponentWins = 0;
@@ -41,7 +39,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     private void initializeGUI() {
         setTitle("Connect6 - RMI Client");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout(8,8));
+        setLayout(new BorderLayout(8, 8));
 
         // Верхняя панель подключения
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
@@ -58,17 +56,12 @@ public class GameClient extends JFrame implements RemoteClientInterface {
         // Правая панель статуса
         JPanel right = new JPanel();
         right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
-        right.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
+        right.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         statusLabel = new JLabel("Not connected");
         roleLabel = new JLabel("Role: -");
         turnInfoLabel = new JLabel("Turn: -");
         scoreLabel = new JLabel("<html>Score<br>Your wins: 0<br>Opponent wins: 0</html>");
-
-        statusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        roleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        turnInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        scoreLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         right.add(statusLabel);
         right.add(Box.createVerticalStrut(8));
@@ -77,22 +70,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
         right.add(turnInfoLabel);
         right.add(Box.createVerticalStrut(8));
         right.add(scoreLabel);
-
-        rematchButton = new JButton("Try Again");
-        rematchButton.setEnabled(false);
-        rematchButton.setAlignmentX(Component.LEFT_ALIGNMENT);
-        rematchButton.addActionListener(e -> {
-            if (gameServer != null && playerName != null) {
-                try {
-                    gameServer.requestRematch(playerName);
-                    rematchButton.setEnabled(false);
-                } catch (RemoteException ex) {
-                    showError("Rematch request failed: " + ex.getMessage());
-                }
-            }
-        });
-        right.add(Box.createVerticalStrut(8));
-        right.add(rematchButton);
 
         add(right, BorderLayout.EAST);
 
@@ -180,7 +157,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     public void gameStarted() {
         SwingUtilities.invokeLater(() -> {
             gameActive = true;
-            rematchButton.setEnabled(false);
             statusLabel.setText("Game started!");
         });
     }
@@ -196,8 +172,20 @@ public class GameClient extends JFrame implements RemoteClientInterface {
 
             updateScore();
 
-            JOptionPane.showMessageDialog(this, "Game Over! Winner: " + winner);
-            rematchButton.setEnabled(true);
+            int option = JOptionPane.showConfirmDialog(
+                    this,
+                    "Game Over! Winner: " + winner + "\nDo you want to play again?",
+                    "Game Over",
+                    JOptionPane.YES_NO_OPTION
+            );
+
+            if (option == JOptionPane.YES_OPTION) {
+                try {
+                    gameServer.requestRematch(playerName);
+                } catch (RemoteException e) {
+                    showError("Rematch request failed: " + e.getMessage());
+                }
+            }
         });
     }
 
@@ -208,8 +196,10 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     @Override
     public void showError(String message) {
         SwingUtilities.invokeLater(() -> {
-            if (message.isEmpty()) statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
-            else JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+            if (message.isEmpty())
+                statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
+            else
+                statusLabel.setText(message);
         });
     }
 
