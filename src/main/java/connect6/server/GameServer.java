@@ -1,64 +1,98 @@
 package connect6.server;
 
 import connect6.game.Connect6Game;
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import connect6.rmi.RemoteGameInterface;
+import connect6.rmi.RemoteClientInterface;
 
-public class GameServer {
-    private ServerSocket serverSocket;
-    private List<ClientHandler> clients = new ArrayList<>();
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
+import java.util.HashMap;
+import java.util.Map;
+
+public class GameServer implements RemoteGameInterface {
     private Connect6Game game;
+    private Map<String, RemoteClientInterface> clients = new HashMap<>();
     private boolean gameStarted = false;
+    private String currentPlayer;
 
     public static void main(String[] args) {
-        new GameServer().startServer();
-    }
-
-    public void startServer() {
         try {
-            serverSocket = new ServerSocket(ServerConstants.PORT);
-            System.out.println("Connect6 Server started on port " + ServerConstants.PORT);
-            System.out.println("Waiting for 2 players...");
+            // Установка политики безопасности для RMI
+            System.setProperty("java.security.policy", "server.policy");
 
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("New client connected: " + clientSocket.getInetAddress());
+            GameServer server = new GameServer();
+            RemoteGameInterface stub = (RemoteGameInterface) UnicastRemoteObject.exportObject(server, 0);
 
-                ClientHandler clientHandler = new ClientHandler(clientSocket, clients.size() + 1, this);
-                clients.add(clientHandler);
-                new Thread(clientHandler).start();
+            Registry registry = LocateRegistry.createRegistry(ServerConstants.RMI_PORT);
+            registry.rebind(ServerConstants.GAME_SERVER_NAME, stub);
 
-                if (clients.size() == 2 && !gameStarted) {
-                    startGame();
-                }
-            }
-        } catch (IOException e) {
+            System.out.println("Connect6 RMI Server started on port " + ServerConstants.RMI_PORT);
+            System.out.println("Server bound to: " + ServerConstants.GAME_SERVER_NAME);
+            System.out.println("Waiting for players...");
+
+        } catch (Exception e) {
+            System.err.println("Server exception: " + e.toString());
             e.printStackTrace();
         }
     }
 
-    private void startGame() {
+    @Override
+    public synchronized void registerClient(RemoteClientInterface client, String playerName) throws RemoteException {
+        if (clients.size() >= 2) {
+            client.showError("Server is full. Maximum 2 players allowed.");
+            return;
+        }
+
+        clients.put(playerName, client);
+        System.out.println("Player connected: " + playerName);
+
+        if (clients.size() == 2 && !gameStarted) {
+            startGame();
+        } else {
+            client.showError("Waiting for another player...");
+        }
+    }
+
+    private void startGame() throws RemoteException {
         game = new Connect6Game();
         gameStarted = true;
 
-        Collections.shuffle(clients);
+        String[] playerNames = clients.keySet().toArray(new String[0]);
+        String blackPlayer = playerNames[0];
+        String whitePlayer = playerNames[1];
 
-        clients.get(0).setPlayerRole("BLACK");
-        clients.get(1).setPlayerRole("WHITE");
+        clients.get(blackPlayer).setPlayerRole("BLACK");
+        clients.get(whitePlayer).setPlayerRole("WHITE");
 
-        broadcast(ServerConstants.CMD_GAME_START);
-        clients.get(0).sendMessage(ServerConstants.CMD_ROLE + " BLACK");
-        clients.get(1).sendMessage(ServerConstants.CMD_ROLE + " WHITE");
-        broadcast(ServerConstants.CMD_TURN + " BLACK");
+        currentPlayer = blackPlayer;
 
-        System.out.println("Game started! Black: " + clients.get(0).clientId + ", White: " + clients.get(1).clientId);
+        for (RemoteClientInterface client : clients.values()) {
+            client.gameStarted();
+        }
+
+        clients.get(currentPlayer).setCurrentTurn(currentPlayer);
+        broadcastBoard();
+
+        System.out.println("Game started! Black: " + blackPlayer + ", White: " + whitePlayer);
     }
 
-    public void processMove(ClientHandler client, int x, int y) {
-        char expectedPlayer = (client.getPlayerRole().equals("BLACK")) ? 'B' : 'W';
+    @Override
+    public synchronized void makeMove(String playerName, int x, int y) throws RemoteException {
+        if (!gameStarted) {
+            clients.get(playerName).showError("Game not started yet");
+            return;
+        }
+
+        if (!playerName.equals(currentPlayer)) {
+            clients.get(playerName).showError("Not your turn");
+            return;
+        }
+
+        char expectedPlayer = (playerName.equals(clients.keySet().toArray(new String[0])[0])) ? 'B' : 'W';
         if (game.getCurrentPlayer() != expectedPlayer) {
-            client.sendMessage(ServerConstants.CMD_ERROR + " Not your turn");
+            clients.get(playerName).showError("Not your turn");
             return;
         }
 
@@ -66,43 +100,47 @@ public class GameServer {
             broadcastBoard();
 
             if (game.isGameOver()) {
-                broadcast(ServerConstants.CMD_GAME_OVER + " " + game.getWinner());
-                System.out.println("Game over! Winner: " + game.getWinner());
-                gameStarted = false;
-                clients.clear();
+                String winner = game.getWinner();
+                for (RemoteClientInterface client : clients.values()) {
+                    client.gameOver(winner);
+                }
+                System.out.println("Game over! Winner: " + winner);
+                resetGame();
             } else {
-                String currentPlayer = (game.getCurrentPlayer() == 'B') ? "BLACK" : "WHITE";
-                broadcast(ServerConstants.CMD_TURN + " " + currentPlayer);
+                // Switch turn
+                String[] players = clients.keySet().toArray(new String[0]);
+                currentPlayer = currentPlayer.equals(players[0]) ? players[1] : players[0];
+                clients.get(currentPlayer).setCurrentTurn(currentPlayer);
             }
         } else {
-            client.sendMessage(ServerConstants.CMD_ERROR + " Invalid move");
+            clients.get(playerName).showError("Invalid move");
         }
     }
 
-    private void broadcastBoard() {
-        StringBuilder boardState = new StringBuilder();
-        char[][] board = game.getBoard();
+    @Override
+    public synchronized void disconnect(String playerName) throws RemoteException {
+        clients.remove(playerName);
+        System.out.println("Player disconnected: " + playerName);
 
-        for (int i = 0; i < game.getBoardSize(); i++) {
-            for (int j = 0; j < game.getBoardSize(); j++) {
-                boardState.append(board[i][j]);
+        if (gameStarted && clients.size() < 2) {
+            for (RemoteClientInterface client : clients.values()) {
+                client.gameOver("DISCONNECT");
             }
-        }
-
-        broadcast(ServerConstants.CMD_BOARD + " " + boardState.toString());
-    }
-
-    private void broadcast(String message) {
-        for (ClientHandler client : clients) {
-            client.sendMessage(message);
+            resetGame();
         }
     }
 
-    public void removeClient(ClientHandler client) {
-        clients.remove(client);
-        if (clients.size() < 2 && gameStarted) {
-            broadcast(ServerConstants.CMD_GAME_OVER + " DISCONNECT");
-            gameStarted = false;
+    private void broadcastBoard() throws RemoteException {
+        char[][] board = game.getBoard();
+        for (RemoteClientInterface client : clients.values()) {
+            client.updateBoard(board);
         }
+    }
+
+    private void resetGame() {
+        gameStarted = false;
+        clients.clear();
+        currentPlayer = null;
+        System.out.println("Game reset. Waiting for new players...");
     }
 }
