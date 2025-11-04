@@ -5,16 +5,12 @@ public class Connect6Game {
     private char currentPlayer;
     private boolean gameOver;
     private String winner;
-    private int moveCount; // для отслеживания первого хода
+    private int moveCount;
     private int stonesPlacedThisTurn;
 
     public Connect6Game() {
         board = new char[GameConstants.BOARD_SIZE][GameConstants.BOARD_SIZE];
-        currentPlayer = GameConstants.BLACK_STONE;
-        gameOver = false;
-        moveCount = 0;
-        stonesPlacedThisTurn = 0;
-        initializeBoard();
+        resetGame();
     }
 
     private void initializeBoard() {
@@ -29,7 +25,6 @@ public class Connect6Game {
         if (gameOver || !isValidPosition(x, y) || board[y][x] != GameConstants.EMPTY_CELL) {
             return false;
         }
-
         board[y][x] = currentPlayer;
         stonesPlacedThisTurn++;
 
@@ -43,8 +38,7 @@ public class Connect6Game {
 
     public boolean shouldSwitchPlayer() {
         if (moveCount == 0 && stonesPlacedThisTurn >= 1) return true;
-        if (moveCount > 0 && stonesPlacedThisTurn >= 2) return true;
-        return false;
+        return moveCount > 0 && stonesPlacedThisTurn >= 2;
     }
 
     public void switchPlayer() {
@@ -57,7 +51,7 @@ public class Connect6Game {
 
     private boolean checkWin(int x, int y) {
         char player = board[y][x];
-        int[][] directions = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
+        int[][] directions = {{1,0},{0,1},{1,1},{1,-1}};
         for (int[] d : directions) {
             int dx = d[0], dy = d[1];
             int count = 1;
