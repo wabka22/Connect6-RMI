@@ -151,7 +151,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
   public void setCurrentTurn(String player) {
     SwingUtilities.invokeLater(
         () -> {
-          myTurn = player.equals(playerName); // Текущий игрок по имени
+          myTurn = player.equals(playerName);
           turnInfoLabel.setText(myTurn ? "Your turn (" + playerRole + ")" : "Opponent's turn");
         });
   }
@@ -172,8 +172,9 @@ public class GameClient extends JFrame implements RemoteClientInterface {
           gameActive = false;
           myTurn = false;
 
-          if (winner.equals(playerRole.name())) playerWins++;
-          else if (!winner.equals("DISCONNECT")) opponentWins++;
+          if (winner.equals(playerRole.name()) || winner.equals("OPPONENT_DISCONNECTED"))
+            playerWins++;
+          else opponentWins++;
 
           updateScore();
 

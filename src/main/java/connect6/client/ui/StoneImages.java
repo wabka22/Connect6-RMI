@@ -30,8 +30,4 @@ public class StoneImages {
   public static BufferedImage getWhite() {
     return white;
   }
-
-  public static BufferedImage getField() {
-    return field;
-  }
 }
