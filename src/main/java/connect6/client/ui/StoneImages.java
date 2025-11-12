@@ -10,10 +10,6 @@ public class StoneImages {
 
   public static void load() {
     try {
-      field = ImageIO.read(new File("images/field.gif"));
-    } catch (IOException ignored) {
-    }
-    try {
       black = ImageIO.read(new File("images/black-stone.gif"));
     } catch (IOException ignored) {
     }

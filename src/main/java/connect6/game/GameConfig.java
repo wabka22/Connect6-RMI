@@ -1,7 +1,7 @@
 package connect6.game;
 
 public enum GameConfig {
-  INSTANCE;
+  CFG;
 
   public final int BOARD_SIZE = 19;
   public final int WIN_COUNT = 6;

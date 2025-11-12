@@ -1,8 +1,5 @@
-package connect6.client;
+package connect6.client.ui;
 
-import connect6.client.ui.BoardRenderer;
-import connect6.client.ui.HoverHighlighter;
-import connect6.client.ui.StoneImages;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -20,9 +17,11 @@ public class GameBoardPanel extends JPanel {
   public GameBoardPanel(int boardSize) {
     this.boardSize = boardSize;
     this.board = new char[boardSize][boardSize];
+
     setPreferredSize(
         new Dimension(boardSize * cellSize + offset * 2, boardSize * cellSize + offset * 2));
     setBackground(new Color(222, 184, 135));
+
     StoneImages.load();
 
     addMouseMotionListener(
@@ -82,22 +81,26 @@ public class GameBoardPanel extends JPanel {
 
     for (int y = 0; y < boardSize; y++) {
       for (int x = 0; x < boardSize; x++) {
-        if (board[y][x] == 'B')
-          g2.drawImage(
-              StoneImages.getBlack(),
-              offset + x * cellSize - 5,
-              offset + y * cellSize - 5,
-              cellSize,
-              cellSize,
-              this);
-        else if (board[y][x] == 'W')
-          g2.drawImage(
-              StoneImages.getWhite(),
-              offset + x * cellSize - 5,
-              offset + y * cellSize - 5,
-              cellSize,
-              cellSize,
-              this);
+        switch (board[y][x]) {
+          case 'B':
+            g2.drawImage(
+                StoneImages.getBlack(),
+                offset + x * cellSize - 5,
+                offset + y * cellSize - 5,
+                cellSize,
+                cellSize,
+                this);
+            break;
+          case 'W':
+            g2.drawImage(
+                StoneImages.getWhite(),
+                offset + x * cellSize - 5,
+                offset + y * cellSize - 5,
+                cellSize,
+                cellSize,
+                this);
+            break;
+        }
       }
     }
   }

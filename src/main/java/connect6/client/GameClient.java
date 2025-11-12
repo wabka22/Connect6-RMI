@@ -1,5 +1,6 @@
 package connect6.client;
 
+import connect6.client.ui.GameBoardPanel;
 import connect6.game.PlayerType;
 import connect6.rmi.RemoteClientInterface;
 import connect6.rmi.RemoteGameInterface;
@@ -11,6 +12,7 @@ import java.rmi.server.UnicastRemoteObject;
 import javax.swing.*;
 
 public class GameClient extends JFrame implements RemoteClientInterface {
+
   private RemoteGameInterface gameServer;
   private String playerName;
   private PlayerType playerRole;
@@ -18,7 +20,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
   private boolean gameActive = false;
 
   private JLabel statusLabel;
-  private JLabel turnInfoLabel;
+  private JLabel turnLabel;
   private JLabel roleLabel;
   private JLabel scoreLabel;
   private GameBoardPanel boardPanel;
@@ -35,49 +37,55 @@ public class GameClient extends JFrame implements RemoteClientInterface {
       UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
     } catch (Exception ignored) {
     }
+
     initializeGUI();
   }
 
   private void initializeGUI() {
     setTitle("Connect6 - RMI Client");
-    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
     setLayout(new BorderLayout(8, 8));
 
-    JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+    // Верхняя панель
+    JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
     JTextField nameField = new JTextField("Player" + (System.currentTimeMillis() % 1000), 15);
-    JButton connectButton = new JButton("Connect");
-    JButton disconnectButton = new JButton("Disconnect");
-    disconnectButton.setEnabled(false);
+    JButton connectBtn = new JButton("Connect");
+    JButton disconnectBtn = new JButton("Disconnect");
+    disconnectBtn.setEnabled(false);
+
     top.add(new JLabel("Player Name:"));
     top.add(nameField);
-    top.add(connectButton);
-    top.add(disconnectButton);
+    top.add(connectBtn);
+    top.add(disconnectBtn);
     add(top, BorderLayout.NORTH);
 
+    // Правая панель
     JPanel right = new JPanel();
     right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
     right.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
     statusLabel = new JLabel("Not connected");
     roleLabel = new JLabel("Role: -");
-    turnInfoLabel = new JLabel("Turn: -");
-    scoreLabel = new JLabel("<html>Score<br>Your wins: 0<br>Opponent wins: 0</html>");
+    turnLabel = new JLabel("Turn: -");
+    scoreLabel = new JLabel(getScoreText());
 
     right.add(statusLabel);
     right.add(Box.createVerticalStrut(8));
     right.add(roleLabel);
     right.add(Box.createVerticalStrut(8));
-    right.add(turnInfoLabel);
+    right.add(turnLabel);
     right.add(Box.createVerticalStrut(8));
     right.add(scoreLabel);
 
     add(right, BorderLayout.EAST);
 
+    // Панель доски
     boardPanel = new GameBoardPanel(19);
     boardPanel.setClickListener(this::handleBoardClick);
     add(boardPanel, BorderLayout.CENTER);
 
-    connectButton.addActionListener(
+    // Кнопки
+    connectBtn.addActionListener(
         e -> {
           playerName = nameField.getText().trim();
           if (playerName.isEmpty()) {
@@ -86,12 +94,12 @@ public class GameClient extends JFrame implements RemoteClientInterface {
           }
           connectToServer(playerName);
           if (gameServer != null) {
-            connectButton.setEnabled(false);
-            disconnectButton.setEnabled(true);
+            connectBtn.setEnabled(false);
+            disconnectBtn.setEnabled(true);
           }
         });
 
-    disconnectButton.addActionListener(e -> dispose());
+    disconnectBtn.addActionListener(e -> dispose());
 
     setSize(900, 850);
     setLocationRelativeTo(null);
@@ -100,9 +108,10 @@ public class GameClient extends JFrame implements RemoteClientInterface {
   private void connectToServer(String name) {
     try {
       System.setProperty("java.security.policy", "client.policy");
+
       Registry registry =
-          LocateRegistry.getRegistry(ClientConstants.SERVER_HOST, ClientConstants.RMI_PORT);
-      gameServer = (RemoteGameInterface) registry.lookup(ClientConstants.GAME_SERVER_NAME);
+          LocateRegistry.getRegistry(ClientConfig.CFG.SERVER_HOST, ClientConfig.CFG.RMI_PORT);
+      gameServer = (RemoteGameInterface) registry.lookup(ClientConfig.CFG.GAME_SERVER_NAME);
 
       RemoteClientInterface stub =
           (RemoteClientInterface) UnicastRemoteObject.exportObject(this, 0);
@@ -152,7 +161,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     SwingUtilities.invokeLater(
         () -> {
           myTurn = player.equals(playerName);
-          turnInfoLabel.setText(myTurn ? "Your turn (" + playerRole + ")" : "Opponent's turn");
+          turnLabel.setText(myTurn ? "Your turn (" + playerRole + ")" : "Opponent's turn");
         });
   }
 
@@ -176,7 +185,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
             playerWins++;
           else opponentWins++;
 
-          updateScore();
+          scoreLabel.setText(getScoreText());
 
           int option =
               JOptionPane.showConfirmDialog(
@@ -195,13 +204,12 @@ public class GameClient extends JFrame implements RemoteClientInterface {
         });
   }
 
-  private void updateScore() {
-    scoreLabel.setText(
-        "<html>Score<br>Your wins: "
-            + playerWins
-            + "<br>Opponent wins: "
-            + opponentWins
-            + "</html>");
+  private String getScoreText() {
+    return "<html>Score<br>Your wins: "
+        + playerWins
+        + "<br>Opponent wins: "
+        + opponentWins
+        + "</html>";
   }
 
   @Override
@@ -217,11 +225,10 @@ public class GameClient extends JFrame implements RemoteClientInterface {
   @Override
   public void dispose() {
     try {
-      if (gameServer != null && playerName != null) {
-        gameServer.disconnect(playerName);
-      }
+      if (gameServer != null && playerName != null) gameServer.disconnect(playerName);
     } catch (Exception ignored) {
     }
+
     super.dispose();
     System.exit(0);
   }

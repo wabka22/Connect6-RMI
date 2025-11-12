@@ -9,14 +9,14 @@ public class Connect6Game {
   private boolean isFirstTurn;
 
   public Connect6Game() {
-    board = new char[GameConfig.INSTANCE.BOARD_SIZE][GameConfig.INSTANCE.BOARD_SIZE];
+    board = new char[GameConfig.CFG.BOARD_SIZE][GameConfig.CFG.BOARD_SIZE];
     resetGame();
   }
 
   private void initializeBoard() {
-    for (int r = 0; r < GameConfig.INSTANCE.BOARD_SIZE; r++) {
-      for (int c = 0; c < GameConfig.INSTANCE.BOARD_SIZE; c++) {
-        board[r][c] = GameConfig.INSTANCE.EMPTY_CELL;
+    for (int r = 0; r < GameConfig.CFG.BOARD_SIZE; r++) {
+      for (int c = 0; c < GameConfig.CFG.BOARD_SIZE; c++) {
+        board[r][c] = GameConfig.CFG.EMPTY_CELL;
       }
     }
   }
@@ -24,12 +24,12 @@ public class Connect6Game {
   public synchronized PlaceResult placeStone(int x, int y) {
     if (gameOver) return PlaceResult.GAME_OVER;
     if (!isValidPosition(x, y)) return PlaceResult.INVALID_POSITION;
-    if (board[y][x] != GameConfig.INSTANCE.EMPTY_CELL) return PlaceResult.CELL_OCCUPIED;
+    if (board[y][x] != GameConfig.CFG.EMPTY_CELL) return PlaceResult.CELL_OCCUPIED;
 
     board[y][x] =
         (currentPlayer == PlayerType.BLACK)
-            ? GameConfig.INSTANCE.BLACK_STONE
-            : GameConfig.INSTANCE.WHITE_STONE;
+            ? GameConfig.CFG.BLACK_STONE
+            : GameConfig.CFG.WHITE_STONE;
     stonesPlacedThisTurn++;
 
     if (checkWin(x, y)) {
@@ -59,30 +59,27 @@ public class Connect6Game {
       int count = 1;
       int dx = d[0], dy = d[1];
 
-      for (int i = 1; i < GameConfig.INSTANCE.WIN_COUNT; i++) {
+      for (int i = 1; i < GameConfig.CFG.WIN_COUNT; i++) {
         int nx = x + dx * i, ny = y + dy * i;
         if (isValidPosition(nx, ny) && board[ny][nx] == stone) count++;
         else break;
       }
-      for (int i = 1; i < GameConfig.INSTANCE.WIN_COUNT; i++) {
+      for (int i = 1; i < GameConfig.CFG.WIN_COUNT; i++) {
         int nx = x - dx * i, ny = y - dy * i;
         if (isValidPosition(nx, ny) && board[ny][nx] == stone) count++;
         else break;
       }
-      if (count >= GameConfig.INSTANCE.WIN_COUNT) return true;
+      if (count >= GameConfig.CFG.WIN_COUNT) return true;
     }
     return false;
   }
 
   private boolean isValidPosition(int x, int y) {
-    return x >= 0
-        && x < GameConfig.INSTANCE.BOARD_SIZE
-        && y >= 0
-        && y < GameConfig.INSTANCE.BOARD_SIZE;
+    return x >= 0 && x < GameConfig.CFG.BOARD_SIZE && y >= 0 && y < GameConfig.CFG.BOARD_SIZE;
   }
 
   public synchronized char[][] getBoard() {
-    int n = GameConfig.INSTANCE.BOARD_SIZE;
+    int n = GameConfig.CFG.BOARD_SIZE;
     char[][] copy = new char[n][n];
     for (int i = 0; i < n; i++) {
       System.arraycopy(board[i], 0, copy[i], 0, n);
