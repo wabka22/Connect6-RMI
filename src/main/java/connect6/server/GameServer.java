@@ -57,10 +57,8 @@ public class GameServer implements RemoteGameInterface {
     }
 
     clients.put(playerName, client);
-    LOG.info("Player connected: " + playerName);
 
     if (clients.size() == 2) {
-      // Очищаем сообщения и запускаем игру, если она ещё не стартовала
       for (RemoteClientInterface c : clients.values()) {
         try {
           c.showError("");

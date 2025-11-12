@@ -116,7 +116,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
       statusLabel.setText("Connected as: " + name);
     } catch (Exception e) {
       JOptionPane.showMessageDialog(this, "Connection failed: " + e.getMessage());
-      e.printStackTrace();
     }
   }
 
@@ -133,7 +132,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
       gameServer.makeMove(playerName, x, y);
     } catch (RemoteException e) {
       JOptionPane.showMessageDialog(this, "Move failed: " + e.getMessage());
-      e.printStackTrace();
     }
   }
 
