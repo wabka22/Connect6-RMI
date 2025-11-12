@@ -46,7 +46,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     setDefaultCloseOperation(EXIT_ON_CLOSE);
     setLayout(new BorderLayout(8, 8));
 
-    // Верхняя панель
     JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
     JTextField nameField = new JTextField("Player" + (System.currentTimeMillis() % 1000), 15);
     JButton connectBtn = new JButton("Connect");
@@ -59,7 +58,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     top.add(disconnectBtn);
     add(top, BorderLayout.NORTH);
 
-    // Правая панель
     JPanel right = new JPanel();
     right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
     right.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -79,12 +77,10 @@ public class GameClient extends JFrame implements RemoteClientInterface {
 
     add(right, BorderLayout.EAST);
 
-    // Панель доски
     boardPanel = new GameBoardPanel(19);
     boardPanel.setClickListener(this::handleBoardClick);
     add(boardPanel, BorderLayout.CENTER);
 
-    // Кнопки
     connectBtn.addActionListener(
         e -> {
           playerName = nameField.getText().trim();
