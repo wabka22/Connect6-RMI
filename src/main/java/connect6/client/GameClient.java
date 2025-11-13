@@ -1,6 +1,7 @@
 package connect6.client;
 
 import connect6.client.ui.GameClientUI;
+import connect6.client.ui.Images;
 import connect6.game.PlayerType;
 import connect6.rmi.RemoteClientInterface;
 import connect6.rmi.RemoteGameInterface;
@@ -32,7 +33,18 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     } catch (Exception ignored) {
     }
 
-    setTitle("Connect6 - RMI Client");
+    setTitle("Connect6");
+
+    // Загружаем все изображения и иконку
+    Images.load();
+
+    // Устанавливаем иконку окна
+    if (Images.getIcon() != null) {
+      setIconImage(Images.getIcon().getImage());
+    } else {
+      System.err.println("Icon not found!");
+    }
+
     setDefaultCloseOperation(EXIT_ON_CLOSE);
     setContentPane(ui.createMainPanel(this));
     setSize(900, 850);

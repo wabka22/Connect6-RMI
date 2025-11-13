@@ -21,7 +21,7 @@ public class GameBoardPanel extends JPanel {
         new Dimension(boardSize * cellSize + offset * 2, boardSize * cellSize + offset * 2));
     setBackground(new Color(222, 184, 135));
 
-    StoneImages.load();
+    Images.load();
 
     addMouseMotionListener(
         new MouseAdapter() {
@@ -80,8 +80,8 @@ public class GameBoardPanel extends JPanel {
       for (int x = 0; x < boardSize; x++) {
         Image stone =
             switch (board[y][x]) {
-              case 'B' -> StoneImages.getBlack();
-              case 'W' -> StoneImages.getWhite();
+              case 'B' -> Images.getBlack();
+              case 'W' -> Images.getWhite();
               default -> null;
             };
         if (stone != null) {
