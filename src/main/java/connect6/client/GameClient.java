@@ -1,10 +1,9 @@
 package connect6.client;
 
-import connect6.client.ui.GameBoardPanel;
+import connect6.client.ui.GameClientUI;
 import connect6.game.PlayerType;
 import connect6.rmi.RemoteClientInterface;
 import connect6.rmi.RemoteGameInterface;
-import java.awt.*;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -19,12 +18,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
   private boolean myTurn = false;
   private boolean gameActive = false;
 
-  private JLabel statusLabel;
-  private JLabel turnLabel;
-  private JLabel roleLabel;
-  private JLabel scoreLabel;
-  private GameBoardPanel boardPanel;
-
+  private final GameClientUI ui = new GameClientUI();
   private int playerWins = 0;
   private int opponentWins = 0;
 
@@ -38,67 +32,31 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     } catch (Exception ignored) {
     }
 
-    initializeGUI();
-  }
-
-  private void initializeGUI() {
     setTitle("Connect6 - RMI Client");
     setDefaultCloseOperation(EXIT_ON_CLOSE);
-    setLayout(new BorderLayout(8, 8));
-
-    JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-    JTextField nameField = new JTextField("Player" + (System.currentTimeMillis() % 1000), 15);
-    JButton connectBtn = new JButton("Connect");
-    JButton disconnectBtn = new JButton("Disconnect");
-    disconnectBtn.setEnabled(false);
-
-    top.add(new JLabel("Player Name:"));
-    top.add(nameField);
-    top.add(connectBtn);
-    top.add(disconnectBtn);
-    add(top, BorderLayout.NORTH);
-
-    JPanel right = new JPanel();
-    right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
-    right.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-    statusLabel = new JLabel("Not connected");
-    roleLabel = new JLabel("Role: -");
-    turnLabel = new JLabel("Turn: -");
-    scoreLabel = new JLabel(getScoreText());
-
-    right.add(statusLabel);
-    right.add(Box.createVerticalStrut(8));
-    right.add(roleLabel);
-    right.add(Box.createVerticalStrut(8));
-    right.add(turnLabel);
-    right.add(Box.createVerticalStrut(8));
-    right.add(scoreLabel);
-
-    add(right, BorderLayout.EAST);
-
-    boardPanel = new GameBoardPanel(19);
-    boardPanel.setClickListener(this::handleBoardClick);
-    add(boardPanel, BorderLayout.CENTER);
-
-    connectBtn.addActionListener(
-        e -> {
-          playerName = nameField.getText().trim();
-          if (playerName.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Enter player name");
-            return;
-          }
-          connectToServer(playerName);
-          if (gameServer != null) {
-            connectBtn.setEnabled(false);
-            disconnectBtn.setEnabled(true);
-          }
-        });
-
-    disconnectBtn.addActionListener(e -> dispose());
-
+    setContentPane(ui.createMainPanel(this));
     setSize(900, 850);
     setLocationRelativeTo(null);
+
+    ui.scoreLabel.setText(getScoreText());
+    ui.disconnectBtn.setEnabled(false);
+    ui.boardPanel.setClickListener(this::handleBoardClick);
+
+    ui.connectBtn.addActionListener(e -> onConnectClicked());
+    ui.disconnectBtn.addActionListener(e -> dispose());
+  }
+
+  private void onConnectClicked() {
+    playerName = ui.nameField.getText().trim();
+    if (playerName.isEmpty()) {
+      JOptionPane.showMessageDialog(this, "Enter player name");
+      return;
+    }
+    connectToServer(playerName);
+    if (gameServer != null) {
+      ui.connectBtn.setEnabled(false);
+      ui.disconnectBtn.setEnabled(true);
+    }
   }
 
   private void connectToServer(String name) {
@@ -113,7 +71,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
           (RemoteClientInterface) UnicastRemoteObject.exportObject(this, 0);
       gameServer.registerClient(stub, name);
 
-      statusLabel.setText("Connected as: " + name);
+      ui.statusLabel.setText("Connected as: " + name);
     } catch (Exception e) {
       JOptionPane.showMessageDialog(this, "Connection failed: " + e.getMessage());
     }
@@ -137,7 +95,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
 
   @Override
   public void updateBoard(char[][] board) {
-    SwingUtilities.invokeLater(() -> boardPanel.setBoard(board));
+    SwingUtilities.invokeLater(() -> ui.boardPanel.setBoard(board));
   }
 
   @Override
@@ -145,8 +103,8 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     SwingUtilities.invokeLater(
         () -> {
           playerRole = PlayerType.valueOf(role);
-          roleLabel.setText("Role: " + playerRole);
-          statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
+          ui.roleLabel.setText("Role: " + playerRole);
+          ui.statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
         });
   }
 
@@ -155,7 +113,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     SwingUtilities.invokeLater(
         () -> {
           myTurn = player.equals(playerName);
-          turnLabel.setText(myTurn ? "Your turn (" + playerRole + ")" : "Opponent's turn");
+          ui.turnLabel.setText(myTurn ? "Your turn (" + playerRole + ")" : "Opponent's turn");
         });
   }
 
@@ -164,7 +122,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     SwingUtilities.invokeLater(
         () -> {
           gameActive = true;
-          statusLabel.setText("Game started!");
+          ui.statusLabel.setText("Game started!");
         });
   }
 
@@ -179,7 +137,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
             playerWins++;
           else opponentWins++;
 
-          scoreLabel.setText(getScoreText());
+          ui.scoreLabel.setText(getScoreText());
 
           int option =
               JOptionPane.showConfirmDialog(
@@ -211,8 +169,8 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     SwingUtilities.invokeLater(
         () -> {
           if (message.isEmpty())
-            statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
-          else statusLabel.setText(message);
+            ui.statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
+          else ui.statusLabel.setText(message);
         });
   }
 
