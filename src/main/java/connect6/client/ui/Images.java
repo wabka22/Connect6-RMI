@@ -7,38 +7,37 @@ import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 
 public class Images {
-  private static BufferedImage black, white, field;
+  private static BufferedImage black, white;
   private static ImageIcon icon;
 
   public static void load() {
-    black = loadImage("/images/black-stone.gif");
-    white = loadImage("/images/white-stone.gif");
-    icon = loadIcon("/images/icon.png");
+    black = loadBufferedImage("/images/black-stone.gif");
+    white = loadBufferedImage("/images/white-stone.gif");
+    icon = loadImageIcon("/images/icon.png");
   }
 
-  private static BufferedImage loadImage(String path) {
+  private static BufferedImage loadBufferedImage(String path) {
+    URL url = Images.class.getResource(path);
+    if (url == null) {
+      System.err.println("Image not found: " + path);
+      return null;
+    }
     try {
-      URL url = Images.class.getResource(path);
-      if (url != null) {
-        return ImageIO.read(url);
-      } else {
-        System.err.println("Image not found: " + path);
-      }
+      return ImageIO.read(url);
     } catch (IOException e) {
       System.err.println("Error loading image: " + path);
       e.printStackTrace();
+      return null;
     }
-    return null;
   }
 
-  private static ImageIcon loadIcon(String path) {
+  private static ImageIcon loadImageIcon(String path) {
     URL url = Images.class.getResource(path);
-    if (url != null) {
-      return new ImageIcon(url);
-    } else {
+    if (url == null) {
       System.err.println("Icon not found: " + path);
+      return null;
     }
-    return null;
+    return new ImageIcon(url);
   }
 
   public static BufferedImage getBlack() {

@@ -30,6 +30,7 @@ public class Connect6Game {
         (currentPlayer == PlayerType.BLACK)
             ? GameConfig.CFG.BLACK_STONE
             : GameConfig.CFG.WHITE_STONE;
+
     stonesPlacedThisTurn++;
 
     if (checkWin(x, y)) {
@@ -41,8 +42,7 @@ public class Connect6Game {
   }
 
   public synchronized boolean shouldSwitchPlayer() {
-    int limit = isFirstTurn ? 1 : 2;
-    return stonesPlacedThisTurn >= limit;
+    return stonesPlacedThisTurn >= (isFirstTurn ? 1 : 2);
   }
 
   public synchronized void switchPlayer() {
@@ -56,22 +56,24 @@ public class Connect6Game {
     int[][] dirs = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
 
     for (int[] d : dirs) {
-      int count = 1;
-      int dx = d[0], dy = d[1];
-
-      for (int i = 1; i < GameConfig.CFG.WIN_COUNT; i++) {
-        int nx = x + dx * i, ny = y + dy * i;
-        if (isValidPosition(nx, ny) && board[ny][nx] == stone) count++;
-        else break;
+      if (countInDirection(x, y, d[0], d[1], stone)
+              + countInDirection(x, y, -d[0], -d[1], stone)
+              - 1
+          >= GameConfig.CFG.WIN_COUNT) {
+        return true;
       }
-      for (int i = 1; i < GameConfig.CFG.WIN_COUNT; i++) {
-        int nx = x - dx * i, ny = y - dy * i;
-        if (isValidPosition(nx, ny) && board[ny][nx] == stone) count++;
-        else break;
-      }
-      if (count >= GameConfig.CFG.WIN_COUNT) return true;
     }
     return false;
+  }
+
+  private int countInDirection(int x, int y, int dx, int dy, char stone) {
+    int count = 0;
+    while (isValidPosition(x, y) && board[y][x] == stone) {
+      count++;
+      x += dx;
+      y += dy;
+    }
+    return count;
   }
 
   private boolean isValidPosition(int x, int y) {
@@ -87,20 +89,12 @@ public class Connect6Game {
     return copy;
   }
 
-  public synchronized PlayerType getCurrentPlayer() {
-    return currentPlayer;
-  }
-
   public synchronized boolean isGameOver() {
     return gameOver;
   }
 
   public synchronized String getWinner() {
     return winner;
-  }
-
-  public synchronized int getStonesPlacedThisTurn() {
-    return stonesPlacedThisTurn;
   }
 
   public synchronized void resetGame() {
