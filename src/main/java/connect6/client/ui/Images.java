@@ -26,7 +26,6 @@ public class Images {
       return ImageIO.read(url);
     } catch (IOException e) {
       System.err.println("Error loading image: " + path);
-      e.printStackTrace();
       return null;
     }
   }

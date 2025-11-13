@@ -4,7 +4,7 @@ import connect6.client.ui.GameClientUI;
 import connect6.client.ui.Images;
 import connect6.game.PlayerType;
 import connect6.rmi.RemoteClientInterface;
-import connect6.rmi.RemoteGameInterface;
+import connect6.rmi.RemoteServerInterface;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -13,7 +13,7 @@ import javax.swing.*;
 
 public class GameClient extends JFrame implements RemoteClientInterface {
 
-  private RemoteGameInterface gameServer;
+  private RemoteServerInterface gameServer;
   private String playerName;
   private PlayerType playerRole;
   private boolean myTurn = false;
@@ -34,16 +34,10 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     }
 
     setTitle("Connect6");
-
-    // Загружаем все изображения и иконку
     Images.load();
 
-    // Устанавливаем иконку окна
-    if (Images.getIcon() != null) {
-      setIconImage(Images.getIcon().getImage());
-    } else {
-      System.err.println("Icon not found!");
-    }
+    if (Images.getIcon() != null) setIconImage(Images.getIcon().getImage());
+    else System.err.println("Icon not found!");
 
     setDefaultCloseOperation(EXIT_ON_CLOSE);
     setContentPane(ui.createMainPanel(this));
@@ -77,7 +71,7 @@ public class GameClient extends JFrame implements RemoteClientInterface {
 
       Registry registry =
           LocateRegistry.getRegistry(ClientConfig.CFG.SERVER_HOST, ClientConfig.CFG.RMI_PORT);
-      gameServer = (RemoteGameInterface) registry.lookup(ClientConfig.CFG.GAME_SERVER_NAME);
+      gameServer = (RemoteServerInterface) registry.lookup(ClientConfig.CFG.GAME_SERVER_NAME);
 
       RemoteClientInterface stub =
           (RemoteClientInterface) UnicastRemoteObject.exportObject(this, 0);
@@ -168,14 +162,6 @@ public class GameClient extends JFrame implements RemoteClientInterface {
         });
   }
 
-  private String getScoreText() {
-    return "<html>Score<br>Your wins: "
-        + playerWins
-        + "<br>Opponent wins: "
-        + opponentWins
-        + "</html>";
-  }
-
   @Override
   public void showError(String message) {
     SwingUtilities.invokeLater(
@@ -195,5 +181,13 @@ public class GameClient extends JFrame implements RemoteClientInterface {
 
     super.dispose();
     System.exit(0);
+  }
+
+  private String getScoreText() {
+    return "<html>Score<br>Your wins: "
+        + playerWins
+        + "<br>Opponent wins: "
+        + opponentWins
+        + "</html>";
   }
 }

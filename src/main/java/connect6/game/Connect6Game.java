@@ -28,8 +28,8 @@ public class Connect6Game {
 
     board[y][x] =
         (currentPlayer == PlayerType.BLACK)
-            ? GameConfig.CFG.BLACK_STONE
-            : GameConfig.CFG.WHITE_STONE;
+            ? GameConfig.CFG.PLAYER1_STONE
+            : GameConfig.CFG.PLAYER2_STONE;
 
     stonesPlacedThisTurn++;
 
@@ -42,7 +42,8 @@ public class Connect6Game {
   }
 
   public synchronized boolean shouldSwitchPlayer() {
-    return stonesPlacedThisTurn >= (isFirstTurn ? 1 : 2);
+    return stonesPlacedThisTurn
+        >= (isFirstTurn ? GameConfig.CFG.FIRST_TURN_STONES : GameConfig.CFG.NORMAL_TURN_STONES);
   }
 
   public synchronized void switchPlayer() {
@@ -53,9 +54,8 @@ public class Connect6Game {
 
   private boolean checkWin(int x, int y) {
     char stone = board[y][x];
-    int[][] dirs = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
 
-    for (int[] d : dirs) {
+    for (int[] d : GameConfig.CFG.DIRECTIONS) {
       if (countInDirection(x, y, d[0], d[1], stone)
               + countInDirection(x, y, -d[0], -d[1], stone)
               - 1

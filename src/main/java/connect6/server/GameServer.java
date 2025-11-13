@@ -4,7 +4,7 @@ import connect6.game.Connect6Game;
 import connect6.game.PlaceResult;
 import connect6.game.PlayerType;
 import connect6.rmi.RemoteClientInterface;
-import connect6.rmi.RemoteGameInterface;
+import connect6.rmi.RemoteServerInterface;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class GameServer implements RemoteGameInterface {
+public class GameServer implements RemoteServerInterface {
 
   private static final Logger LOG = Logger.getLogger(GameServer.class.getName());
 
@@ -24,43 +24,55 @@ public class GameServer implements RemoteGameInterface {
   private String currentPlayer;
   private final Map<String, Boolean> rematchRequests = new LinkedHashMap<>();
   private static Registry registry;
+  private String[] playerOrder;
 
   public static void main(String[] args) {
     System.setProperty("java.security.policy", "server.policy");
     try {
       GameServer server = new GameServer();
-      RemoteGameInterface stub = (RemoteGameInterface) UnicastRemoteObject.exportObject(server, 0);
+      RemoteServerInterface stub =
+          (RemoteServerInterface) UnicastRemoteObject.exportObject(server, 0);
       registry = LocateRegistry.createRegistry(ServerConfig.INSTANCE.RMI_PORT);
       registry.rebind(ServerConfig.INSTANCE.GAME_SERVER_NAME, stub);
-      LOG.info(" Server started on port " + ServerConfig.INSTANCE.RMI_PORT);
+      LOG.info("Server started on port " + ServerConfig.INSTANCE.RMI_PORT);
     } catch (Exception e) {
       LOG.log(Level.SEVERE, "Server error", e);
     }
   }
 
-  @Override
-  public synchronized void registerClient(RemoteClientInterface client, String playerName)
+  private void notifyClients(RemoteAction action) {
+    for (RemoteClientInterface client : clients.values()) {
+      try {
+        action.run(client);
+      } catch (RemoteException e) {
+        LOG.log(Level.WARNING, "Failed to notify client", e);
+      }
+    }
+  }
+
+  private boolean validateClient(RemoteClientInterface client, String playerName)
       throws RemoteException {
     if (clients.containsKey(playerName)) {
       client.showError("Name already in use. Choose another.");
-      return;
+      return false;
     }
-
     if (clients.size() >= ServerConfig.INSTANCE.MAX_PLAYERS) {
       client.showError(ServerConfig.INSTANCE.MSG_SERVER_FULL);
-      return;
+      return false;
     }
+    return true;
+  }
+
+  @Override
+  public synchronized void registerClient(RemoteClientInterface client, String playerName)
+      throws RemoteException {
+    if (!validateClient(client, playerName)) return;
 
     clients.put(playerName, client);
     LOG.info("Player connected: " + playerName);
 
-    if (clients.size() == 2) {
-      for (RemoteClientInterface c : clients.values()) {
-        try {
-          c.showError("");
-        } catch (RemoteException ignored) {
-        }
-      }
+    if (clients.size() == ServerConfig.INSTANCE.MAX_PLAYERS) {
+      notifyClients(c -> c.showError(""));
       if (!gameStarted) startGame();
     } else {
       client.showError(ServerConfig.INSTANCE.MSG_WAITING_PLAYER);
@@ -72,50 +84,35 @@ public class GameServer implements RemoteGameInterface {
     gameStarted = true;
     rematchRequests.clear();
 
-    String[] players = clients.keySet().toArray(new String[0]);
-    if (players.length < 2) return;
+    playerOrder = clients.keySet().toArray(new String[0]);
+    if (playerOrder.length < 2) return;
 
-    currentPlayer = players[0];
+    currentPlayer = playerOrder[0];
 
-    clients.get(players[0]).setPlayerRole(PlayerType.BLACK.name());
-    clients.get(players[1]).setPlayerRole(PlayerType.WHITE.name());
+    clients.get(playerOrder[0]).setPlayerRole(PlayerType.BLACK.name());
+    clients.get(playerOrder[1]).setPlayerRole(PlayerType.WHITE.name());
 
-    for (RemoteClientInterface c : clients.values()) {
-      try {
-        c.gameStarted();
-      } catch (RemoteException e) {
-        LOG.log(Level.WARNING, "Failed to start game", e);
-      }
-    }
-
+    notifyClients(RemoteClientInterface::gameStarted);
     clients.get(currentPlayer).setCurrentTurn(currentPlayer);
     broadcastBoard();
 
-    LOG.info("New game started between " + players[0] + " and " + players[1]);
+    LOG.info("New game started between " + playerOrder[0] + " and " + playerOrder[1]);
   }
 
   @Override
   public synchronized void makeMove(String playerName, int x, int y) throws RemoteException {
     if (!gameStarted || !playerName.equals(currentPlayer)) return;
 
-    RemoteClientInterface client = clients.get(playerName);
     PlaceResult result = game.placeStone(x, y);
-
     if (result != PlaceResult.OK) {
-      client.showError("Invalid move: " + result);
+      clients.get(playerName).showError("Invalid move: " + result);
       return;
     }
 
     broadcastBoard();
 
     if (game.isGameOver()) {
-      for (RemoteClientInterface c : clients.values()) {
-        try {
-          c.gameOver(game.getWinner());
-        } catch (RemoteException e) {
-          LOG.log(Level.WARNING, "Failed to notify client", e);
-        }
-      }
+      notifyClients(c -> c.gameOver(game.getWinner()));
       gameStarted = false;
       return;
     }
@@ -125,13 +122,7 @@ public class GameServer implements RemoteGameInterface {
       game.switchPlayer();
     }
 
-    for (RemoteClientInterface c : clients.values()) {
-      try {
-        c.setCurrentTurn(currentPlayer);
-      } catch (RemoteException e) {
-        LOG.log(Level.WARNING, "Failed to update turn", e);
-      }
-    }
+    notifyClients(c -> c.setCurrentTurn(currentPlayer));
   }
 
   @Override
@@ -147,20 +138,14 @@ public class GameServer implements RemoteGameInterface {
       String remaining = clients.keySet().iterator().next();
       LOG.info("Player " + playerName + " disconnected. " + remaining + " wins by default.");
 
-      try {
-        RemoteClientInterface winner = clients.get(remaining);
+      RemoteClientInterface winner = clients.get(remaining);
+      if (winner != null) {
         winner.showError(ServerConfig.INSTANCE.MSG_PLAYER_DISCONNECTED);
-        winner.gameOver(remaining);
-      } catch (RemoteException e) {
-        LOG.log(Level.WARNING, "Failed to notify remaining player", e);
+        winner.gameOver("DISCONNECT");
       }
 
       gameStarted = false;
       currentPlayer = null;
-    }
-
-    if (clients.isEmpty()) {
-      LOG.info("No active players. Waiting for new connections...");
     }
   }
 
@@ -169,7 +154,8 @@ public class GameServer implements RemoteGameInterface {
     if (!clients.containsKey(playerName)) return;
 
     rematchRequests.put(playerName, true);
-    if (rematchRequests.size() == 2 && rematchRequests.values().stream().allMatch(b -> b)) {
+    if (rematchRequests.size() == ServerConfig.INSTANCE.MAX_PLAYERS
+        && rematchRequests.values().stream().allMatch(b -> b)) {
       LOG.info("Starting rematch...");
       startGame();
     }
@@ -177,17 +163,10 @@ public class GameServer implements RemoteGameInterface {
 
   private void broadcastBoard() {
     char[][] boardCopy = game.getBoard();
-    for (Map.Entry<String, RemoteClientInterface> entry : clients.entrySet()) {
-      try {
-        entry.getValue().updateBoard(boardCopy);
-      } catch (RemoteException e) {
-        LOG.log(Level.WARNING, "Client unreachable: " + entry.getKey(), e);
-      }
-    }
+    notifyClients(c -> c.updateBoard(boardCopy));
   }
 
   private void switchCurrentPlayer() {
-    String[] players = clients.keySet().toArray(new String[0]);
-    currentPlayer = currentPlayer.equals(players[0]) ? players[1] : players[0];
+    currentPlayer = currentPlayer.equals(playerOrder[0]) ? playerOrder[1] : playerOrder[0];
   }
 }
