@@ -34,10 +34,12 @@ public class GameClient extends JFrame implements RemoteClientInterface {
     }
 
     setTitle("Connect6");
-    Images.load();
 
-    if (Images.getIcon() != null) setIconImage(Images.getIcon().getImage());
-    else System.err.println("Icon not found!");
+    if (Images.ICON != null) {
+      setIconImage(Images.ICON.getImage());
+    } else {
+      System.err.println("Icon not found!");
+    }
 
     setDefaultCloseOperation(EXIT_ON_CLOSE);
     setContentPane(ui.createMainPanel(this));
