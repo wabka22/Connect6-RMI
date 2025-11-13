@@ -139,11 +139,17 @@ public class GameClient extends JFrame implements RemoteClientInterface {
           gameActive = false;
           myTurn = false;
 
-          if (winner.equals(playerRole.name()) || winner.equals("OPPONENT_DISCONNECTED"))
-            playerWins++;
+          if (winner.equals(playerRole != null ? playerRole.name() : "")
+              || "OPPONENT_DISCONNECTED".equals(winner)) playerWins++;
           else opponentWins++;
 
           ui.scoreLabel.setText(getScoreText());
+
+          if ("OPPONENT_DISCONNECTED".equals(winner)) {
+            ui.statusLabel.setText("Opponent disconnected. Waiting for new game...");
+            playerRole = null;
+            return;
+          }
 
           int option =
               JOptionPane.showConfirmDialog(
@@ -166,9 +172,12 @@ public class GameClient extends JFrame implements RemoteClientInterface {
   public void showError(String message) {
     SwingUtilities.invokeLater(
         () -> {
-          if (message.isEmpty())
-            ui.statusLabel.setText("Connected as: " + playerName + " (" + playerRole + ")");
-          else ui.statusLabel.setText(message);
+          if (message.isEmpty()) {
+            String roleText = (playerRole != null) ? " (" + playerRole + ")" : "";
+            ui.statusLabel.setText("Connected as: " + playerName + roleText);
+          } else {
+            ui.statusLabel.setText(message);
+          }
         });
   }
 

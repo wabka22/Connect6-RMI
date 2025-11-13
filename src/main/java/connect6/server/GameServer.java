@@ -56,10 +56,6 @@ public class GameServer implements RemoteServerInterface {
       client.showError("Name already in use. Choose another.");
       return false;
     }
-    if (clients.size() >= ServerConfig.INSTANCE.MAX_PLAYERS) {
-      client.showError(ServerConfig.INSTANCE.MSG_SERVER_FULL);
-      return false;
-    }
     return true;
   }
 
@@ -71,22 +67,22 @@ public class GameServer implements RemoteServerInterface {
     clients.put(playerName, client);
     LOG.info("Player connected: " + playerName);
 
-    if (clients.size() == ServerConfig.INSTANCE.MAX_PLAYERS) {
-      notifyClients(c -> c.showError(""));
-      if (!gameStarted) startGame();
-    } else {
+    if (clients.size() < 2) {
       client.showError(ServerConfig.INSTANCE.MSG_WAITING_PLAYER);
+      return;
     }
+
+    if (!gameStarted) startGame();
   }
 
   private void startGame() throws RemoteException {
+    if (clients.size() < 2) return;
+
     game = new Connect6Game();
     gameStarted = true;
     rematchRequests.clear();
 
     playerOrder = clients.keySet().toArray(new String[0]);
-    if (playerOrder.length < 2) return;
-
     currentPlayer = playerOrder[0];
 
     clients.get(playerOrder[0]).setPlayerRole(PlayerType.BLACK.name());
@@ -113,7 +109,7 @@ public class GameServer implements RemoteServerInterface {
 
     if (game.isGameOver()) {
       notifyClients(c -> c.gameOver(game.getWinner()));
-      gameStarted = false;
+      endGame();
       return;
     }
 
@@ -131,22 +127,33 @@ public class GameServer implements RemoteServerInterface {
 
     clients.remove(playerName);
     rematchRequests.remove(playerName);
-
     LOG.info("Player disconnected: " + playerName);
 
-    if (gameStarted && clients.size() == 1) {
-      String remaining = clients.keySet().iterator().next();
-      LOG.info("Player " + playerName + " disconnected. " + remaining + " wins by default.");
-
-      RemoteClientInterface winner = clients.get(remaining);
-      if (winner != null) {
-        winner.showError(ServerConfig.INSTANCE.MSG_PLAYER_DISCONNECTED);
-        winner.gameOver("DISCONNECT");
+    if (gameStarted) {
+      if (clients.size() == 1) {
+        String remaining = clients.keySet().iterator().next();
+        RemoteClientInterface winner = clients.get(remaining);
+        if (winner != null) {
+          winner.showError(ServerConfig.INSTANCE.MSG_PLAYER_DISCONNECTED);
+          winner.gameOver("OPPONENT_DISCONNECTED");
+        }
+        endGame();
+      } else if (clients.size() < 2) {
+        endGame();
       }
-
-      gameStarted = false;
-      currentPlayer = null;
     }
+
+    if (!gameStarted && clients.size() >= 2) {
+      startGame();
+    }
+  }
+
+  private void endGame() {
+    gameStarted = false;
+    currentPlayer = null;
+    game = null;
+    rematchRequests.clear();
+    playerOrder = new String[0];
   }
 
   @Override
@@ -154,19 +161,20 @@ public class GameServer implements RemoteServerInterface {
     if (!clients.containsKey(playerName)) return;
 
     rematchRequests.put(playerName, true);
-    if (rematchRequests.size() == ServerConfig.INSTANCE.MAX_PLAYERS
-        && rematchRequests.values().stream().allMatch(b -> b)) {
+    if (rematchRequests.size() >= 2 && rematchRequests.values().stream().allMatch(b -> b)) {
       LOG.info("Starting rematch...");
       startGame();
     }
   }
 
   private void broadcastBoard() {
+    if (game == null) return;
     char[][] boardCopy = game.getBoard();
     notifyClients(c -> c.updateBoard(boardCopy));
   }
 
   private void switchCurrentPlayer() {
+    if (playerOrder == null || playerOrder.length < 2) return;
     currentPlayer = currentPlayer.equals(playerOrder[0]) ? playerOrder[1] : playerOrder[0];
   }
 }

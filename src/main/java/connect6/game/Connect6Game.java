@@ -1,7 +1,7 @@
 package connect6.game;
 
 public class Connect6Game {
-  private char[][] board;
+  private final char[][] board;
   private PlayerType currentPlayer;
   private boolean gameOver;
   private String winner;
@@ -47,6 +47,7 @@ public class Connect6Game {
   }
 
   public synchronized void switchPlayer() {
+    if (gameOver) return;
     currentPlayer = (currentPlayer == PlayerType.BLACK) ? PlayerType.WHITE : PlayerType.BLACK;
     stonesPlacedThisTurn = 0;
     isFirstTurn = false;
@@ -56,27 +57,28 @@ public class Connect6Game {
     char stone = board[y][x];
 
     for (int[] d : GameConfig.CFG.DIRECTIONS) {
-      if (countInDirection(x, y, d[0], d[1], stone)
-              + countInDirection(x, y, -d[0], -d[1], stone)
-              - 1
-          >= GameConfig.CFG.WIN_COUNT) {
-        return true;
-      }
+      int count = 1;
+      count += countInDirection(x, y, d[0], d[1], stone);
+      count += countInDirection(x, y, -d[0], -d[1], stone);
+      count--;
+      if (count >= GameConfig.CFG.WIN_COUNT) return true;
     }
     return false;
   }
 
   private int countInDirection(int x, int y, int dx, int dy, char stone) {
     int count = 0;
-    while (isValidPosition(x, y) && board[y][x] == stone) {
+    int nx = x + dx;
+    int ny = y + dy;
+    while (isValidPosition(nx, ny) && board[ny][nx] == stone) {
       count++;
-      x += dx;
-      y += dy;
+      nx += dx;
+      ny += dy;
     }
     return count;
   }
 
-  private boolean isValidPosition(int x, int y) {
+  private static boolean isValidPosition(int x, int y) {
     return x >= 0 && x < GameConfig.CFG.BOARD_SIZE && y >= 0 && y < GameConfig.CFG.BOARD_SIZE;
   }
 
